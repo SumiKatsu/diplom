@@ -116,6 +116,7 @@ def edge_index(uzel):
             14, 17, 47, 52,
             10, 13, 42, 48]
 
+
     result = []
     for i in range(len(edge)):
         res = []
@@ -134,34 +135,155 @@ def edge_index(uzel):
     return result
 
 
-# Модуль Юнга диэлектрика
-youngs_modulus = 5250
+def shape_functions(x, y, xi, eta):
 
-# Вычисление функций формы
-def shape_functions(xi, eta):
-    N = np.array([(1 - xi) * (1 - eta) / 4,
-                  (1 + xi) * (1 - eta) / 4,
-                  (1 + xi) * (1 + eta) / 4,
-                  (1 - xi) * (1 + eta) / 4,
-                  ((1 - xi**2) * (1 + eta) / 2)])
-    return N
+    dfdxi = -(1-eta)*x[0]/4 + (1-eta)*x[1]/4 + (1+eta)*x[2]/4 - (1+eta)*x[3]/4 - (1+eta)*x[4]
 
-# Вычисление производных функций формы по локальным координатам
-def shape_function_derivatives(xi, eta):
-    dN_dxi = np.array([-(1 - eta) / 4,
-                       (1 - eta) / 4,
-                       (1 + eta) / 4,
-                      -(1 + eta) / 4,
-                      -xi * (1 + eta) / 2])
+    dfdeta = -(1-xi)*x[0]/4 - (1+xi)*x[1]/4 + (1+xi)*x[2]/4 + (1-xi)*x[3]/4 - (1-xi*xi)*x[4]/2
 
-    dN_deta = np.array([-(1 - xi) / 4,
-                       -(1 + xi) / 4,
-                       (1 + xi) / 4,
-                       (1 - xi) / 4,
-                       (1 - xi**2) / 2])
+    dfidxi = -(1-eta)*y[0]/4 + (1-eta)*y[1]/4 + (1+eta)*y[2]/4 - (1+eta)*y[3]/4 - (1+eta)*y[4]
 
-    return dN_dxi, dN_deta
+    dfideta= -(1-xi)*y[0]/4 - (1+xi)*y[1]/4 + (1+xi)*y[2]/4 + (1-xi)*y[3]/4 - (1-xi*xi)*y[4]/2
 
-# Вычисление локальной матрицы жесткости
+    dn1dxi = -(1-eta)/4
+
+    dn1deta = -(1-xi)/4
+
+    dn2dxi = (1-eta)/4
+
+    dn2deta = -(1+xi)/4
+
+    dn3dxi = (1+eta)/4
+
+    dn3deta = (1+xi)/4
+
+    dn4dxi = -(1+eta)/4
+
+    dn4deta = (1-xi)/4
+
+    dn1dx = (dn1dxi * 1 / dfdxi) + (dn1deta * 1 / dfdeta)
+
+    dn2dx = (dn2dxi * 1 / dfdxi) + (dn2deta * 1 / dfdeta)
+
+    dn3dx = (dn3dxi * 1 / dfdxi) + (dn3deta * 1 / dfdeta)
+
+    dn4dx = (dn4dxi * 1 / dfdxi) + (dn4deta * 1 / dfdeta)
+
+    dn1dy = (dn1dxi * 1 / dfidxi) + (dn1deta * 1 / dfideta)
+
+    dn2dy = (dn2dxi * 1 / dfidxi) + (dn2deta * 1 / dfideta)
+
+    dn3dy = (dn3dxi * 1 / dfidxi) + (dn3deta * 1 / dfideta)
+
+    dn4dy = (dn4dxi * 1 / dfidxi) + (dn4deta * 1 / dfideta)
+
+
+    #Матрица B:
+    B = [[dn1dx, 0, dn2dx, 0, dn3dx, 0, dn4dx, 0],
+         [0, dn1dy, 0, dn2dy, 0, dn3dy, 0, dn4dy],
+         [dn1dy, dn1dx, dn2dy, dn2dx, dn3dy, dn3dx, dn4dy, dn4dx]]
+
+    # Матрица B транспонированная:
+    Bt = [[dn1dx, 0, dn1dy],
+          [0, dn1dy, dn1dx],
+          [dn2dx, 0, dn2dy],
+          [0, dn2dy, dn2dx],
+          [dn3dx, 0, dn3dy],
+          [0, dn3dy, dn3dx],
+          [dn4dx, 0, dn4dy],
+          [0, dn4dy, dn4dx]]
+
+    # Якобиан:
+    J = [[dfdxi, dfdeta],
+         [dfidxi, dfideta]]
+
+    J = abs(np.linalg.det(J))
+
+    # Матрица L:
+    L = [[-dn1dx, -dn2dx, -dn3dx, -dn4dx],
+         [-dn1dy, -dn2dy, -dn3dy, -dn4dy]]
+
+
+    # Матрица L транспонированная:
+    Lt = [[-dn1dx, -dn1dy],
+          [-dn2dx, -dn2dy],
+          [-dn3dx, -dn3dy],
+          [-dn4dx, -dn4dy]]
+
+    res = [B, Bt, J, L, Lt]
+
+    return res
+
+
+def local_stiffness_matrix(x, y, flag):
+    # Матрица C для пьезоэлектрика (Пьезокерамика ЦТС-19)
+    C1 = [[11.22 * pow(10, 10), 6.22 * pow(10, 10), 0],
+          [6.22 * pow(10, 10), 11.22 * pow(10, 10), 0],
+          [0, 0, 2.49 * pow(10, 10)]]
+    # Матрица e для Пьезоэлектрика (Пьезокерамика ЦТС-19)
+    e = [[0, 0, 8.3878],
+         [-6.127, 10.71, 0]]
+    # Матрица Э для Пьезоэлектрика (Пьезокерамика ЦТС-19)
+    E1 = [[7.257 * pow(10, -9), 0],
+          [0, 8.274 * pow(10, -9)]]
+    # Матрица C для упругого диэлектрика(Каучук)
+    E = 0.008 * pow(10, 9)
+    V = 0.47
+    l = (E * V)/((1 + V) * (1 - 2 * V))
+    m = E/(2 * (1 + V))
+
+    C2 = [[l + 2 * m, l, 0],
+          [l, l + 2 * m, 0],
+          [0, 0, m]]
+    # Матрица Э для для упругого диэлектрика(Каучук)
+    e0 = 8.85 * pow(10, -12)
+    e1 = 2.42 * e0
+    E2 = [[e1, 0],
+          [0, e1]]
+
+    gauss_weights = [1, 1, 1, 1]
+    gauss_coords = [[-1 / sqrt(3), -1 / sqrt(3)],
+                    [-1 / sqrt(3), 1 / sqrt(3)],
+                    [1 / sqrt(3), -1 / sqrt(3)],
+                    [1 / sqrt(3), 1 / sqrt(3)]]
+
+    Kuu = np.zeros((8, 8))
+    Kufi = np.zeros((4, 8))
+    Kfifi = np.zeros((4, 4))
+
+    if flag:
+        for i in range(len(gauss_weights)):
+            xi, eta = gauss_coords[i]
+            res = shape_functions(x, y, xi, eta)
+            B = res[0]      # 8 x 3
+            Bt = res[1]     # 3 x 8
+            J = res[2]
+            L = res[3]     # 4 x 2
+            Lt = res[4]    # 2 x 4
+
+            Kuu += np.dot(np.dot(Bt, C1), B) * J * gauss_weights[i]
+
+            Kufi += np.dot(np.dot(Lt, e), B) * J * gauss_weights[i]
+
+            Kfifi += np.dot(np.dot(Lt, E1), L) * J * gauss_weights[i]
+
+    else:
+        for i in range(len(gauss_weights)):
+            xi, eta = gauss_coords[i]
+            res = shape_functions(x, y, xi, eta)
+            B = res[0]  # 8 x 3
+            Bt = res[1]  # 3 x 8
+            J = res[2]
+            L = res[3]  # 4 x 2
+            Lt = res[4]  # 2 x 4
+
+            Kuu += np.dot(np.dot(Bt, C2), B) * J * gauss_weights[i]
+
+            Kfifi += np.dot(np.dot(Lt, E2), L) * J * gauss_weights[i]
+
+    local_matrix = np.block([[Kuu, Kufi.T],
+                            [Kufi, Kfifi]])
+
+    return local_matrix
 
 
