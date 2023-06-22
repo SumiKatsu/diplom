@@ -348,6 +348,7 @@ def data_for_stifness_matrix():
                 else:
                     v = flag[((rb[f'{elem}'][i][j][0][1] + rb[f'{elem}'][i][j][1][1]) / 2, (rb[f'{elem}'][i][j][0][2] + rb[f'{elem}'][i][j][1][2]) / 2)]
                     rb[f'{elem}'][i][j].append(f'{v} ребро')
+            rb[f'{elem}'][i].append((rb[f'{elem}'][0][0][0][1], rb[f'{elem}'][0][0][0][2]))
 
     res = []
 
@@ -363,20 +364,27 @@ def data_for_stifness_matrix():
     uzel = []
     flag = False
     du = 0
-    for el in data:
-        if el[2] != 0:
+    for i in range(4):
+        if data[i][2] != 0:
             flag = True
-            du = minlen(el[2], dop_uzel)
-        edges += ' ' + el[3]
-        x = el[0][1]
-        y = el[0][2]
+            du = minlen(data[i][2], dop_uzel)
+        edges += ' ' + data[i][3]
+        x = data[i][0][1]
+        y = data[i][0][2]
         uzel.append((x, y))
+
+    flag2 = False
+    for elem in uzel:
+        l = sqrt((data[-1][0] - elem[0]) * (data[-1][0] - elem[0]) + (data[-1][1] - elem[1]) * (data[-1][1] - elem[1]))
+        if l > r:
+            flag2 = True
 
     res.append(flag)
     res.append(edges)
     res.append(uzel)
     res.append(numb)
     res.append(du)
+    res.append(flag2)
     return res
 
 
@@ -432,6 +440,7 @@ def new_window():
 def new_window2():
     res = data_for_stifness_matrix()
     du = res[4]
+    flag = res[5]
     x = [res[2][0][0], res[2][1][0], res[2][2][0], res[2][3][0], du[0]]
     y = [res[2][0][1], res[2][1][1], res[2][2][1], res[2][3][1], du[1]]
     new_window2 = Toplevel(root)
@@ -439,49 +448,15 @@ def new_window2():
     new_window2.title("Локальная матрица элемента")
     frame = Frame(new_window2, padx=5, pady=5)
     frame.pack(expand=True)
-    local = compute_local_stiffness_matrix(x,y)
+    local = local_stiffness_matrix(x, y, flag)
+
     for i in range(len(local)):
         for j in range(len(local[i])):
-            if local[i][j] == 0:
-                s = f'{int(local[i][j])}' + ' '
-            else:
-                s = f'{round(local[i][j], 3)}' + ' '
-
-            uzel4 = Label(frame, text=f"{s}")
-            uzel4.grid(row=i, column=j)
+            element = Label(frame, text=f"{local[i][j]}")
+            element.grid(row=i, column=j)
 
 
-def compute_local_stiffness_matrix(x, y):
-    K_local = np.zeros((10, 10))
 
-    for i in range(len(x)-1):
-        for j in range(len(y)-1):
-            xi_values = [-1/np.sqrt(3), 1/np.sqrt(3)]
-            eta_values = [-1/np.sqrt(3), 1/np.sqrt(3)]
-
-            for xi in xi_values:
-                for eta in eta_values:
-                    N = shape_functions(xi, eta)
-                    dN_dxi, dN_deta = shape_function_derivatives(xi, eta)
-
-                    J = np.zeros((2, 2))
-                    for k in range(5):
-                        J[0, 0] += dN_dxi[k] * x[k]
-                        J[0, 1] += dN_deta[k] * x[k]
-                        J[1, 0] += dN_dxi[k] * y[k]
-                        J[1, 1] += dN_deta[k] * y[k]
-
-                    invJ = np.linalg.inv(J)
-
-                    B = np.zeros((3, 10))
-                    for k in range(5):
-                        B[0, 2*k] = dN_dxi[k] * invJ[0, 0] + dN_deta[k] * invJ[0, 1]
-                        B[1, 2*k+1] = dN_dxi[k] * invJ[1, 0] + dN_deta[k] * invJ[1, 1]
-                        B[2, 2*k] = dN_dxi[k] * invJ[0, 0] + dN_deta[k] * invJ[0, 1]
-
-                    K_local += np.transpose(B).dot(youngs_modulus * B) * np.linalg.det(J)
-
-    return K_local
 
 
 root = Tk()
